@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Word: Korapsyon — Family Feud Style</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; padding:18px;
+  font-family:Arial,Helvetica,sans-serif; color:#fff;
+  background:radial-gradient(circle at top,#5b1111 0,#230707 45%,#090909 100%);
+}
+.game{max-width:900px;margin:auto;text-align:center}
+h1{font-size:clamp(30px,7vw,60px);margin:8px 0 2px;text-transform:uppercase;text-shadow:0 4px 15px #000}
+.tag{font-size:16px;color:#f3dada;margin-bottom:18px}
+.question{
+  background:#fff;color:#191919;border-radius:18px;padding:18px 15px;
+  font-size:clamp(20px,4vw,30px);font-weight:800;margin:15px auto 18px;
+  max-width:780px;box-shadow:0 8px 30px #0008;
+}
+.board{
+  max-width:720px;margin:0 auto 20px;padding:14px;
+  background:#130404;border:4px solid #d6a72c;border-radius:20px;
+  box-shadow:0 10px 35px #000;
+}
+.row{
+  display:grid;grid-template-columns:70px 1fr 100px;gap:8px;
+  align-items:center;margin:8px 0;min-height:58px;
+}
+.cell{
+  background:#061f5c;border:2px solid #e4c45b;border-radius:9px;
+  min-height:58px;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:22px;
+}
+.answer{cursor:pointer;user-select:none;position:relative;overflow:hidden}
+.answer .hidden{font-size:26px;letter-spacing:2px}
+.answer.revealed{background:#f4f4f4;color:#111;cursor:default}
+.answer.revealed .hidden{display:none}
+.answer.revealed .text{display:block}
+.text{display:none;font-size:20px}
+.points{font-size:25px}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:14px 0}
+button{
+  border:0;border-radius:12px;padding:13px 20px;font-size:16px;
+  font-weight:900;cursor:pointer;box-shadow:0 4px 12px #0008
+}
+.reveal{background:#ffd447;color:#151515}
+.strike{background:#fff;color:#9a1111}
+.reset{background:#333;color:#fff;border:1px solid #777}
+.scoreboard{display:flex;gap:12px;justify-content:center;margin:15px auto;max-width:600px}
+.team{
+  flex:1;background:#081b4c;border:3px solid #d6a72c;border-radius:15px;padding:12px;
+}
+.team.active{box-shadow:0 0 0 4px #fff5,0 0 25px #ffd447}
+.team input{
+  width:100%;background:transparent;border:0;color:#fff;text-align:center;
+  font-size:18px;font-weight:bold;outline:none
+}
+.score{font-size:40px;font-weight:900;margin-top:4px}
+.strikes{min-height:42px;font-size:36px;letter-spacing:8px;color:#ff4444}
+.status{font-size:18px;font-weight:bold;color:#ffe9a8;min-height:25px}
+.instructions{
+  max-width:720px;margin:18px auto;padding:14px;background:#ffffff12;
+  border-radius:12px;color:#ddd;font-size:14px
+}
+@media(max-width:600px){
+  .row{grid-template-columns:45px 1fr 70px}
+  .cell{font-size:17px}
+  .text{font-size:16px}
+  .points{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>ONE WORD: KORAPSYON</h1>
+  <div class="tag">FAMILY FEUD STYLE • KORAPSYON: SAKIT NG LIPUNAN</div>
+
+  <div class="scoreboard">
+    <div class="team active" id="team1">
+      <input id="name1" value="TEAM 1">
+      <div class="score" id="score1">0</div>
+    </div>
+    <div class="team" id="team2">
+      <input id="name2" value="TEAM 2">
+      <div class="score" id="score2">0</div>
+    </div>
+  </div>
+
+  <div class="question">
+    “Kapag narinig mo ang salitang KORAPSYON, ano ang unang salitang pumapasok sa isip mo?”
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="strikes" id="strikes"></div>
+  <div class="status" id="status">Team 1, ready?</div>
+
+  <div class="controls">
+    <button class="reveal" onclick="revealNext()">REVEAL ANSWER</button>
+    <button class="strike" onclick="addStrike()">❌ STRIKE</button>
+    <button class="reset" onclick="resetGame()">RESET GAME</button>
+  </div>
+
+  <div class="instructions">
+    <b>How to play:</b> Hatiin ang klase sa dalawang teams. Magbigay ng isang salita bawat player.
+    Kapag tama o kapareho ng nasa board, i-click ang <b>REVEAL ANSWER</b>.
+    Ang points ay mapupunta sa kasalukuyang team. Kapag mali, pindutin ang <b>STRIKE</b>.
+    Pag naka-3 strikes, puwedeng lumipat ang turn sa kabilang team.
+  </div>
+</div>
+
+<script>
+const answers = [
+  ["PERA",30],
+  ["PAGNAKAW NG PONDO NG BAYAN",25],
+  ["BONG BONG MARCOS",20],
+  ["PAG-ABUSO SA KAPANGYARIHAN",15],
+  ["BUWAYA",10]
+];
+
+let revealed = Array(answers.length).fill(false);
+let scores = [0,0];
+let current = 0;
+let strikes = 0;
+
+function renderBoard(){
+  const board=document.getElementById("board");
+  board.innerHTML="";
+  answers.forEach((a,i)=>{
+    const row=document.createElement("div");
+    row.className="row";
+    row.innerHTML=`
+      <div class="cell">${i+1}</div>
+      <div class="cell answer ${revealed[i]?'revealed':''}" onclick="reveal(${i})">
+        <span class="hidden">?</span><span class="text">${a[0]}</span>
+      </div>
+      <div class="cell points">${revealed[i]?a[1]:"—"}</div>`;
+    board.appendChild(row);
+  });
+}
+
+function reveal(i){
+  if(revealed[i]) return;
+  revealed[i]=true;
+  scores[current]+=answers[i][1];
+  update();
+  if(revealed.every(Boolean)){
+    document.getElementById("status").textContent="BOARD COMPLETED! 🎉";
+  } else {
+    document.getElementById("status").textContent=
+      document.getElementById("name"+(current+1)).value+" — keep going!";
+  }
+}
+
+function revealNext(){
+  const i=revealed.findIndex(v=>!v);
+  if(i!==-1) reveal(i);
+}
+
+function addStrike(){
+  strikes++;
+  document.getElementById("strikes").textContent="❌".repeat(strikes);
+  if(strikes>=3){
+    document.getElementById("status").textContent="3 STRIKES! Turn goes to the other team.";
+    switchTeam();
+  }else{
+    document.getElementById("status").textContent=
+      "STRIKE! "+document.getElementById("name"+(current+1)).value+" has "+strikes+" strike"+(strikes>1?"s":"")+"!";
+  }
+}
+
+function switchTeam(){
+  current=current===0?1:0;
+  strikes=0;
+  document.getElementById("strikes").textContent="";
+  document.getElementById("status").textContent=
+    document.getElementById("name"+(current+1)).value+", your turn!";
+  document.getElementById("team1").classList.toggle("active",current===0);
+  document.getElementById("team2").classList.toggle("active",current===1);
+}
+
+function update(){
+  document.getElementById("score1").textContent=scores[0];
+  document.getElementById("score2").textContent=scores[1];
+  document.getElementById("team1").classList.toggle("active",current===0);
+  document.getElementById("team2").classList.toggle("active",current===1);
+  renderBoard();
+}
+
+function resetGame(){
+  if(!confirm("Reset the whole game?")) return;
+  revealed=Array(answers.length).fill(false);
+  scores=[0,0]; current=0; strikes=0;
+  document.getElementById("strikes").textContent="";
+  document.getElementById("status").textContent="Team 1, ready?";
+  update();
+}
+
+renderBoard();
+</script>
+</body>
+</html>
